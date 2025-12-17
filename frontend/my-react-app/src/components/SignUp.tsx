@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { UserPlus, User, Mail, Lock, GraduationCap, Users } from 'lucide-react';
+import { UserPlus, User, Mail, Lock } from 'lucide-react';
 
 interface SignUpProps {
-  onSignUp: (email: string, name: string, role: 'student' | 'teacher' | 'admin') => void;
+  onSignUp: (email: string, name: string, role: 'student') => void;
   onSwitchToLogin: () => void;
 }
 
@@ -11,10 +11,9 @@ export function SignUp({ onSignUp, onSwitchToLogin }: SignUpProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -29,31 +28,24 @@ export function SignUp({ onSignUp, onSwitchToLogin }: SignUpProps) {
       return;
     }
 
-    // Get existing users from localStorage
-    const users = JSON.parse(localStorage.getItem('peereval_users') || '[]');
+    try {
+      const res = await fetch('http://localhost:8080/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-    // Check if email already exists
-    if (users.some((u: any) => u.email === email)) {
-      setError('An account with this email already exists');
-      return;
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Signup failed');
+      }
+
+      const user = await res.json();
+      // Auto login after signup
+      onSignUp(user.email, user.name, 'student');
+    } catch (err: any) {
+      setError(err.message || 'Signup failed');
     }
-
-    // Add new user
-    const newUser = {
-      id: Date.now().toString(),
-      name,
-      email,
-      password,
-      role,
-      createdAt: new Date().toISOString(),
-      status: 'active',
-    };
-
-    users.push(newUser);
-    localStorage.setItem('peereval_users', JSON.stringify(users));
-
-    // Auto login after signup
-    onSignUp(email, name, role);
   };
 
   return (
@@ -139,22 +131,6 @@ export function SignUp({ onSignUp, onSwitchToLogin }: SignUpProps) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-gray-700 mb-2">Role</label>
-              <div className="relative">
-                <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as 'student' | 'teacher' | 'admin')}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="student">Student</option>
-                  <option value="teacher">Teacher</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-
             <button
               type="submit"
               className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
@@ -180,4 +156,3 @@ export function SignUp({ onSignUp, onSwitchToLogin }: SignUpProps) {
     </div>
   );
 }
-
